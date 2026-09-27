@@ -1,0 +1,20 @@
+---
+title: "Project  1"
+author: "MMendoza"
+format: html
+editor: visual
+---
+
+## Setup/Misc.
+
+```{r}
+
+```
+
+## Part 1: Data Processing
+
+```{r}
+
+```
+
+## Part 2: Function Writing
