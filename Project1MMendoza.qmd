@@ -39,6 +39,19 @@ str(data, max.level = 1)
 raw_json <- content(data, as = "text", encoding = "UTF-8")
 parsed_data <- fromJSON(raw_json)
 
+# Function to Parse Variable Values
+variable_get <- function( jsonURL, varList, outname) {
+  data <- httr::GET(jsonURL)
+  str(data, max.level = 1)
+  
+  # 2) Parse returned information for the actual article information
+  raw_json <- content(data, as = "text", encoding = "UTF-8")
+  parsed_data <- fromJSON(raw_json)
+  
+  #
+  
+}
+
 ```
 
 ## Part 2: Function Writing
