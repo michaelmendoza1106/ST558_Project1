@@ -26,44 +26,64 @@ set.seed(123)
 
 ## Part 1: Data Processing
 
+### Parsing Variable Values
+
 ```{r}
-# 1) Use httr::GET to return topic information 
-# using SEPT 01, 2026 as date due to 30 day Free trail restriction
-
-url <- "https://api.census.gov/data/2021/acs/acs1/pums/variables.json"
-varlist <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", 
-             "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX", 
-             "REGION", "DIVISION", "ST")
-
-unparsed_data <- httr::GET(url)
-str(unparsed_data, max.level = 1)
-
-# 2) Parse returned information for the actual article information
-raw_json <- content(unparsed_data, as = "text")
-raw_data <- fromJSON(raw_json)
-parsed_data <- raw_data$variables
-
-# Filter only necessary variables
-# 1) create a list of variables that are both requested and present
-targets <- intersect(varlist, names(parsed_data))
-
-# 2) select matching vars from data. 
-output <- parsed_data[targets]
-
-
 # Function to Parse Variable Values
-variable_get <- function( jsonURL, varList, outName) {
-  data <- httr::GET(jsonURL)
-  str(data, max.level = 1)
+variable_get <- function( YEAR) {
   
-  # 2) Parse returned information for the actual article information
-  raw_json <- content(data, as = "text", encoding = "UTF-8")
-  parsed_data <- fromJSON(raw_json)
+  # 1) Create jsonURL based on year selected
+  jsonURL <- str_c("https://api.census.gov/data/", YEAR, 
+                   "/acs/acs1/pums/variables.json")
+
+  # 2) Use get() to call unparsed data
+  unparsed_data <- httr::GET(jsonURL)
+  str(unparsed_data, max.level = 1)
   
-  # 3) save .RDS file to Datafolder
-  saveRDS(parsed_data, file = outName)
+  # 3) parse returned information for the actual article information
+  raw_json <- content(unparsed_data, as = "text")
+  raw_data <- fromJSON(raw_json)
+  parsed_data <- raw_data$variables
+  
+  # 4) Filter only necessary variables
+    # 4.1) If Else condition to alter needed variables based on year
+    varlist <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", 
+                 "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX", 
+                 "REGION", "DIVISION")
+    
+    
+    # 4.) create a list of variables that are both requested and present
+    targets <- intersect(varlist, names(parsed_data))
+    
+    # 4.) select matching vars from data. 
+    output <- parsed_data[targets]
+  
+  
+  # 5) save .RDS file to Datafolder
+      # 5.1) Create unique file name per year to save to data folder
+        outfile <- str_c("Data/", YEAR, ".rds")
+        
+      # 5.2) Save output as RDS
+        saveRDS(output, file = outfile)
   
 }
+
+#Call 2021 Data
+variable_get("2021")
+
+#Call 2022 Data
+variable_get("2022")
+
+#Call 2023 Data
+variable_get("2023")
+
+#Call 2024 Data
+variable_get("2024")
+```
+
+### Parsing API Data
+
+```{r}
 
 ```
 
