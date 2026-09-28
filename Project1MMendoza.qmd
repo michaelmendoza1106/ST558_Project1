@@ -18,6 +18,7 @@ library(RSQLite)
 library(tidycensus)
 library(jsonlite)
 library(httr)
+library(lubridate)
 
 
 # Set seed for random data creation for replication
@@ -46,11 +47,18 @@ variable_get <- function( YEAR) {
   parsed_data <- raw_data$variables
   
   # 4) Filter only necessary variables
-    # 4.1) If Else condition to alter needed variables based on year
+    # 4.1) If  condition to alter needed variables based on year
+    if (YEAR %in% c("2021", "2022")) {
     varlist <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", 
                  "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX", 
-                 "REGION", "DIVISION")
-    
+                 "REGION", "DIVISION", "ST")
+    }
+    else if (YEAR %in% c("2023", "2024")) {
+    varlist <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP",
+                 "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX", 
+                 "REGION", "DIVISION", "STATE")
+        
+    }
     
     # 4.) create a list of variables that are both requested and present
     targets <- intersect(varlist, names(parsed_data))
@@ -65,8 +73,11 @@ variable_get <- function( YEAR) {
         
       # 5.2) Save output as RDS
         saveRDS(output, file = outfile)
-  
+        
+  #this is just for QC, print dataframe for review
+  return(output)
 }
+
 
 #Call 2021 Data
 variable_get("2021")
@@ -84,7 +95,35 @@ variable_get("2024")
 ### Parsing API Data
 
 ```{r}
+# CallPums data
+# assign URL to data
+URL <- ""
 
+# 2) Use get() to call unparsed data
+unparsed_data <- httr::GET(jsonURL)
+str(unparsed_data, max.level = 1)
+
+# Helper Function to convert to Tibble
+parse_tibble <- function(api_response) {
+  # Check HTTP status
+  if (http_status(api_response)$category != "Success") {
+    stop("API request failed with status: ", status_code(api_response))
+  }
+  
+  # Extract content and parse
+  raw_content <- content(api_response, as = "text", encoding = "UTF-8")
+  json_matrix <- fromJSON(raw_content)
+  
+  # Extract headers (first row) and data (remaining rows)
+  headers <- json_matrix[1, ]
+  data_rows <- json_matrix[-1, , drop = FALSE]
+  
+  # 4. Convert to tibble and set column names
+  clean_tibble <- as_tibble(data_rows, .name_repair = "minimal") %>% 
+    set_names(headers)
+  
+  return(clean_tibble)
+}
 ```
 
 ## Part 2: Function Writing
