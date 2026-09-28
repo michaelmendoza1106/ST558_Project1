@@ -31,16 +31,28 @@ set.seed(123)
 # using SEPT 01, 2026 as date due to 30 day Free trail restriction
 
 url <- "https://api.census.gov/data/2021/acs/acs1/pums/variables.json"
+varlist <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", 
+             "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX", 
+             "REGION", "DIVISION", "ST")
 
-data <- httr::GET(url)
-str(data, max.level = 1)
+unparsed_data <- httr::GET(url)
+str(unparsed_data, max.level = 1)
 
 # 2) Parse returned information for the actual article information
-raw_json <- content(data, as = "text", encoding = "UTF-8")
-parsed_data <- fromJSON(raw_json)
+raw_json <- content(unparsed_data, as = "text")
+raw_data <- fromJSON(raw_json)
+parsed_data <- raw_data$variables
+
+# Filter only necessary variables
+# 1) create a list of variables that are both requested and present
+targets <- intersect(varlist, names(parsed_data))
+
+# 2) select matching vars from data. 
+output <- parsed_data[targets]
+
 
 # Function to Parse Variable Values
-variable_get <- function( jsonURL, varList, outname) {
+variable_get <- function( jsonURL, varList, outName) {
   data <- httr::GET(jsonURL)
   str(data, max.level = 1)
   
@@ -48,7 +60,8 @@ variable_get <- function( jsonURL, varList, outname) {
   raw_json <- content(data, as = "text", encoding = "UTF-8")
   parsed_data <- fromJSON(raw_json)
   
-  #
+  # 3) save .RDS file to Datafolder
+  saveRDS(parsed_data, file = outName)
   
 }
 
