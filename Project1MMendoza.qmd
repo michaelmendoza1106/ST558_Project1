@@ -97,22 +97,24 @@ variable_get("2024")
 ```{r}
 # Do the API get() once because the guidelines said to. 
 # assign URL to data
-URL <- "https://api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca"
+URL2024 <- "https://api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca"
 
 # 2) Use get() to call unparsed data
-unparsed_data <- httr::GET(URL)
-str(unparsed_data, max.level = 1)
+unparsed_data2024 <- httr::GET(URL2024)
+str(unparsed_data2024, max.level = 1)
 
-#function to call and create the datasets
-
-#function to parse and convert to tibble
+#helper function to parse and convert to tibble
 parse_data <- function(YEAR, KEY){
 #create URL
-URL <- str_c("https://api.census.gov/data/", 
+  URL <- str_c("https://api.census.gov/data/", 
              YEAR, "/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=", KEY)
-  
+
+# Get and string data 
+unparsed_data <- httr::GET(URL)
+str(unparsed_data, max.level = 1)  
+   
 #Content and prase the data
-raw_json <- content(URL, as = "text")
+raw_json <- content(unparsed_data, as = "text")
 raw_data <- fromJSON(raw_json)
 
 # Store as tibble Handle data to clean and format columns
@@ -123,8 +125,29 @@ output <- as_tibble(raw_data[-1, ], .name_repair = "minimal") %>%
 return(output)
 }
 
-#test the result
-results <- parse_data("2021", "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca")
+# test the function
+results <- parse_data("2024", "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca")
+
+# Create Function to take year and key to parse data, convert to tibble, 
+# and handle the various options requested in the project outline
+parse_pums <- function(YEAR = 2024, KEY){
+parsed_data <- parse_data(YEAR, KEY) 
+
+}
+
+#Test the function
+parse_pums("2023", "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca")
+
+
+
+
+
+
+
+
+
+
+
 
 
 
