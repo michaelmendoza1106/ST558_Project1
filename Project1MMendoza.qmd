@@ -11,11 +11,11 @@ editor: visual
 
 # Uncomment Librarys Required
 library(tidyverse)
-#library(readxl)
-#library(readr)
-#library(DBI)
-#library(RSQLite)
-#library(tidycensus)
+library(readxl)
+library(readr)
+library(DBI)
+library(RSQLite)
+library(tidycensus)
 library(jsonlite)
 library(httr)
 
@@ -30,18 +30,15 @@ set.seed(123)
 # 1) Use httr::GET to return topic information 
 # using SEPT 01, 2026 as date due to 30 day Free trail restriction
 
-url <- "https://api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca"
+url <- "https://api.census.gov/data/2021/acs/acs1/pums/variables.json"
 
 data <- httr::GET(url)
-str(news_data, max.level = 1)
+str(data, max.level = 1)
 
 # 2) Parse returned information for the actual article information
-content(data)
-data_parsed <- fromJSON(rawToChar(data$content))
+raw_json <- content(data, as = "text", encoding = "UTF-8")
+parsed_data <- fromJSON(raw_json)
 
-# Store & print actual article information
-articles_df <- as_tibble(data_parsed$articles)
-articles_df
 ```
 
 ## Part 2: Function Writing
