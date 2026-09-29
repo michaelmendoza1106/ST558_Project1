@@ -103,7 +103,7 @@ variable_get("2024")
 
 ### Parsing API Data
 
-The code below is simply the set up requested in the outline. It specifies the URL for the year "2024" to show how to connect to the API database and return the unparsed results.
+The code below is simply the set up requested in the outline. It specifies the URL for the year "2024" to show how to connect to the API database and return the unparsed results. this will be used to test helper function 1. the unparased data is stored as "unparsed_data2024".
 
 ```{r}
 # Do the API get() once because the guidelines said to. 
@@ -115,7 +115,7 @@ unparsed_data2024 <- httr::GET(URL2024)
 str(unparsed_data2024, max.level = 1)
 ```
 
-
+The following is a helper function to parse the unparsed results from a GET() function. it uses the first row of the dataset to assign colnames, and all the rows after become the rows for the outputted tibble dataset.
 
 ```{r}
 #HELPER FUNCTION 1: to parse and convert to tibble
@@ -134,7 +134,14 @@ return(output)
 }
 ```
 
+The following tests the helper function against the unparsed data from the first part of section "Parsing API Data". It stores the results as object "parsed_data_test" and prints the results
 
+```{r}
+parsed_data_test <- parse_data(unparsed_data2024)
+print(parsed_data_test)
+```
+
+The following is a helper function. helped heavily by LLM to create, it takes a variable designated as "Time" variable and convert to a numeric datetime variable, adjusting for AM/PM as well as midnight transition. it then calculates the midpoint and returns the HMS time object. due to this being created mostly by a LLM, the testing will be done in the next function when it is used.
 
 ```{r}
 #HELPER FUNCTION 2: DATE TIME (Helped from LLMs as per guidelines) time interval #strings and returns the midpoint time
@@ -168,7 +175,19 @@ parse_pums_time_midpoint <- function(time_str) {
 
 ```
 
+The following code creates a helper function that pulls the year .rds files to get the levels needed for specified categorical variables.
 
+```{r}
+getLevels <- function(YEAR){
+  file_name <- paste0(YEAR, ".rds")
+  file_path <- file.path("Data/", file_name)
+  var_list <- readRDS(file_path)
+  
+  return(var_list)
+}
+```
+
+The following code creates the function "parse_pums". this function takes as input the specified year (2024 as default) in character format, the API key as a character, a vector of characters for the numeric variables ("AGEP", "PWGTP" are default), a vector of categorical variables ("SEX" as default), the geolevel required ("STATE" as default), and the specified geography subset specified (NULL by default to return the STATE info as needed).
 
 ```{r}
 # Create Function to take year and key to parse data, convert to tibble, 
@@ -177,7 +196,7 @@ parse_pums <- function(YEAR = "2024",
                        KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
                        NUM_VARS = c("AGEP", "PWGTP"),
                        CAT_VARS = c("SEX"),
-                       GEO_LEVEL = "State",
+                       GEO_LEVEL = "STATE",
                        GEO_SUBSET = NULL){
 
 # Verify Parameters are valid
@@ -203,25 +222,31 @@ if (length(CAT_VARS) < 1) {
 }
 
 # Validate Geography Level
-if (length(GEO_LEVEL) != 1 || GEO_LEVEL == "All" || !GEO_LEVEL %in% c("Region", "Division", "State")) {
-  stop("Error: 'GEO_LEVEL' must be a single value of either 'Region', 'Division', or 'State'.")
+if (length(GEO_LEVEL) != 1 || GEO_LEVEL == "ALL" || !GEO_LEVEL %in% c("REGION", "DIVISION", "STATE", "ST")) {
+  stop("Error: 'GEO_LEVEL' must be a single value of either 'REGION', 'DIVISION', or 'STATE'.")
 }
 
 # ---- 2. HANDLE GEOGRAPHY SUBSETS & DEFAULTS ----
 # Setup defaults if GEO_SUBSET is NULL
 if (is.null(GEO_SUBSET)) {
   GEO_SUBSET <- switch(GEO_LEVEL,
-                       "State" = "42",      # Default to Pennsylvania (42)
-                       "Division" = "2",   # Default Middle Atlantic Division
-                       "Region" = "1")     # Default Northeast Region
+                       "STATE" = "42",    # Default to Pennsylvania (42)
+                       "DIVISION" = "2",  # Default Middle Atlantic Division
+                       "REGION" = "1")    # Default Northeast Region
 }
 
 # Map user choice to the Census URL parameters
-# (Note: In actual application, validate GEO_SUBSET against your .rds file lists here)
 geo_param <- switch(GEO_LEVEL,
-                    "State" = paste0("state:", if(tolower(GEO_SUBSET) == "all") "*" else GEO_SUBSET),
-                    "Division" = paste0("division:", if(tolower(GEO_SUBSET) == "all") "*" else GEO_SUBSET),
-                    "Region" = paste0("region:", if(tolower(GEO_SUBSET) == "all") "*" else GEO_SUBSET))
+                    "STATE" = paste0("state:", 
+                                     if(tolower(GEO_SUBSET) == "ALL") "*"
+                                     else GEO_SUBSET),
+                    "DIVISION" = paste0("division:", 
+                                        if(tolower(GEO_SUBSET) == "ALL") "*" 
+                                        else GEO_SUBSET),
+                    "REGION" = paste0("region:", 
+                                      if(tolower(GEO_SUBSET) == "ALL") "*" 
+                                      else GEO_SUBSET)
+                    )
 
 # ---- 3. CONSTRUCT URL & GET DATA ----
 base_url <- str_c("https://api.census.gov/data/", YEAR, "/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=")
@@ -236,50 +261,53 @@ df <- parse_data(res)
 # Parse Numeric and Time variables
 for (var in NUM_VARS) {
   if (var %in% c("JWAP", "JWDP")) {
-    # Apply Midpoint Time Helper (Helper 1)
+    # Apply Midpoint Time Helper (Helper 2)
     df[[var]] <- map(df[[var]], parse_pums_time_midpoint) 
   } else {
     df[[var]] <- as.numeric(df[[var]])
   }
 }
 
+#call the .rds list to parse categorical variables into factors. 
+file_name <- paste0(YEAR, ".rds")
+file_path <- file.path("Data/", file_name)
+var_list <- readRDS(file_path)
+
 # Parse Categorical variables into factors
 # NOTE: Replace these mock lists with your readRDS("your_file.rds") level lookups!
-sex_levels <- c("1" = "Male", "2" = "Female")
-schl_levels <- c("24" = "Doctorate degree", "23" = "Professional degree", "22" = "Master's degree") 
+levels <- test(YEAR)
 
 for (var in CAT_VARS) {
-  if (var == "SEX") {
-    df[[var]] <- factor(df[[var]], levels = names(sex_levels), labels = sex_levels)
-  } else if (var == "SCHL") {
-    df[[var]] <- factor(df[[var]], levels = names(schl_levels), labels = schl_levels)
-  } else {
-    df[[var]] <- as.factor(df[[var]]) # Fallback if specific labels aren't defined
-  }
+    # select current level from .rds List output from getLevels helper function
+    current_levels <- all_levels[[var]]
+    df[[var]] <- factor(df[[var]], levels = names(current_levels), 
+                        labels = current_levels)
 }
 
 # ---- 5. ASSIGN CLASS SUBCLASS & RETURN ----
 class(df) <- c("census", class(df))
 return(df)
-
-
 }
+
+
 
 #Test the function
 data2023 <- parse_pums(2023)
 
 ```
 
-
-
 ```{r}
 
 
+getLevels <- function(YEAR){
+file_name <- paste0(YEAR, ".rds")
+file_path <- file.path("Data/", file_name)
+var_list <- readRDS(file_path)
 
+return(var_list)
+}
 
-
-
-
+output_test <- getLevels("2024")
 
 
 
