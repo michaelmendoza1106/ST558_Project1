@@ -29,6 +29,8 @@ set.seed(123)
 
 ### Parsing Variable Values
 
+The function "variable_get" is a function designed to take the value of "YEAR" as a character input. It will return the variable list for the specified year ("2021", "2022", "2023", "2024") by creating the URL from the year associated with the .json file, parse the results into a datalist, and then will match and output the required variables for the specified year, and save the list as an .rds file in the "Data" subfolder.
+
 ```{r}
 # Function to Parse Variable Values
 variable_get <- function( YEAR) {
@@ -48,6 +50,10 @@ variable_get <- function( YEAR) {
   
   # 4) Filter only necessary variables
     # 4.1) If  condition to alter needed variables based on year
+    if (!(YEAR %in% c("2021", "2022", "2023", "2024"))) {
+      stop("ERROR: input Variable YEAR is not in list of 2021, 2022, 2023, 2024")
+    }
+    else {
     if (YEAR %in% c("2021", "2022")) {
     varlist <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", 
                  "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX", 
@@ -59,7 +65,7 @@ variable_get <- function( YEAR) {
                  "REGION", "DIVISION", "STATE")
         
     }
-    
+    }
     # 4.2) create a list of variables that are both requested and present
     targets <- intersect(varlist, names(parsed_data))
     
@@ -77,8 +83,11 @@ variable_get <- function( YEAR) {
   #this is just for QC, print dataframe for review
   return(output)
 }
+```
 
+The following code executes the "variable_get" function on the 4 requested years ("2021", "2022", "2023", "2024")
 
+```{r}
 #Call 2021 Data
 variable_get("2021")
 
@@ -94,6 +103,8 @@ variable_get("2024")
 
 ### Parsing API Data
 
+The code below is simply the set up requested in the outline. It specifies the URL for the year "2024" to show how to connect to the API database and return the unparsed results.
+
 ```{r}
 # Do the API get() once because the guidelines said to. 
 # 1) assign URL to data
@@ -102,7 +113,11 @@ URL2024 <- "https://api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&for
 # 2) Use get() to call unparsed data
 unparsed_data2024 <- httr::GET(URL2024)
 str(unparsed_data2024, max.level = 1)
+```
 
+
+
+```{r}
 #HELPER FUNCTION 1: to parse and convert to tibble
 parse_data <- function(unparsed_data){
    
@@ -117,7 +132,11 @@ output <- as_tibble(raw_data[-1, ], .name_repair = "minimal") %>%
 #Return the results for outputing
 return(output)
 }
+```
 
+
+
+```{r}
 #HELPER FUNCTION 2: DATE TIME (Helped from LLMs as per guidelines) time interval #strings and returns the midpoint time
 parse_pums_time_midpoint <- function(time_str) {
   if (is.na(time_str) || time_str == "" || time_str == "N/A") return(hms(NA))
@@ -147,9 +166,11 @@ parse_pums_time_midpoint <- function(time_str) {
   return(seconds_to_period(midpoint_seconds %% 86400))
 }
 
+```
 
 
 
+```{r}
 # Create Function to take year and key to parse data, convert to tibble, 
 # and handle the various options requested in the project outline
 parse_pums <- function(YEAR = "2024",
@@ -208,7 +229,7 @@ get_vars <- paste(unique(c(NUM_VARS, CAT_VARS)), collapse = ",")
 
 res <- GET(base_url, query = list(get = get_vars, `for` = geo_param, key = KEY))
 
-# Use Helper 2 to create raw tibble
+# Use Helper 1 to create raw tibble
 df <- parse_data(res)
 
 # ---- 4. DATA PARSING & TYPE CONVERSIONS ----
@@ -247,7 +268,11 @@ return(df)
 #Test the function
 data2023 <- parse_pums(2023)
 
+```
 
+
+
+```{r}
 
 
 
