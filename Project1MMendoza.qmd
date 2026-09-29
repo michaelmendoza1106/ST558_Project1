@@ -96,14 +96,14 @@ variable_get("2024")
 
 ```{r}
 # Do the API get() once because the guidelines said to. 
-# assign URL to data
+# 1) assign URL to data
 URL2024 <- "https://api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca"
 
 # 2) Use get() to call unparsed data
 unparsed_data2024 <- httr::GET(URL2024)
 str(unparsed_data2024, max.level = 1)
 
-#helper function to parse and convert to tibble
+#HELPER FUNCTION 1: to parse and convert to tibble
 parse_data <- function(YEAR, KEY){
 #create URL
   URL <- str_c("https://api.census.gov/data/", 
@@ -125,14 +125,71 @@ output <- as_tibble(raw_data[-1, ], .name_repair = "minimal") %>%
 return(output)
 }
 
-# test the function
-results <- parse_data("2024", "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca")
+#HELPER FUNCTION 2: DATE TIME (Helped from LLMs as per guidelines)
+# Helper 1: Parses time interval strings and returns the midpoint time
+parse_pums_time_midpoint <- function(time_str) {
+  if (is.na(time_str) || time_str == "" || time_str == "N/A") return(hms(NA))
+  
+  # Example pattern: "08:00 a.m. to 08:04 a.m."
+  # Extract all HH:MM matches and AM/PM indicators
+  times <- str_extract_all(time_str, "\\d{2}:\\d{2}\\s*(a\\.m\\.|p\\.m\\.|am|pm)")[[1]]
+  
+  if (length(times) < 2) return(hms(NA)) # Return NA if it doesn't match an interval
+  
+  # Convert extracted strings to full datetime objects to calculate midpoint cleanly
+  t1 <- hm(str_extract(times[1], "\\d{2}:\\d{2}"))
+  t2 <- hm(str_extract(times[2], "\\d{2}:\\d{2}"))
+  
+  # Adjust for PM
+  if (str_detect(tolower(times[1]), "p\\.m\\.|pm") && hour(t1) < 12) t1 <- t1 + hours(12)
+  if (str_detect(tolower(times[2]), "p\\.m\\.|pm") && hour(t2) < 12) t2 <- t2 + hours(12)
+  # Handle midnight transitions if necessary (e.g., 11:50 pm to 12:05 am)
+  if (t2 < t1) t2 <- t2 + hours(24)
+  
+  # Calculate midpoint seconds from midnight
+  s1 <- as.numeric(t1)
+  s2 <- as.numeric(t2)
+  midpoint_seconds <- (s1 + s2) / 2
+  
+  # Wrap back into an hms time object (modulus handles rolling over 24 hours)
+  return(seconds_to_period(midpoint_seconds %% 86400))
+}
+
 
 # Create Function to take year and key to parse data, convert to tibble, 
 # and handle the various options requested in the project outline
-parse_pums <- function(YEAR = 2024, KEY){
+parse_pums <- function(YEAR = 2024,
+                       NUM_VARS = c("AGEP", "PWGTP"),
+                       CAT_VARS = c("SEX"),
+                       GEO_LEVELS = "State",
+                       GEO_SUBSET = NULL,){
+  
 parsed_data <- parse_data(YEAR, KEY) 
 
+for (var in numeric_vars) {
+    if (var %in% c("JWAP", "JWDP")) {
+    # Apply Midpoint Time Helper
+      df[[var]] <- map(df[[var]], parse_pums_time_midpoint) 
+    } else {
+      df[[var]] <- as.numeric(df[[var]])
+    }
+}
+
+sex_levels <- c("1" = "Male", "2" = "Female")
+schl_levels <- c("24" = "Doctorate degree", "23" = "Professional degree", "22" = "Master's degree") 
+
+for (var in categorical_vars) {
+  if (var == "SEX") {
+    df[[var]] <- factor(df[[var]], levels = names(sex_levels), labels = sex_levels)
+  } else if (var == "SCHL") {
+    df[[var]] <- factor(df[[var]], levels = names(schl_levels), labels = schl_levels)
+  } else {
+    df[[var]] <- as.factor(df[[var]])
+  }
+}
+
+class(df) <- c("census", class(df))
+return(df)
 }
 
 #Test the function
