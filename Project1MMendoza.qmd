@@ -125,8 +125,7 @@ output <- as_tibble(raw_data[-1, ], .name_repair = "minimal") %>%
 return(output)
 }
 
-#HELPER FUNCTION 2: DATE TIME (Helped from LLMs as per guidelines)
-# Helper 1: Parses time interval strings and returns the midpoint time
+#HELPER FUNCTION 2: DATE TIME (Helped from LLMs as per guidelines) time interval #strings and returns the midpoint time
 parse_pums_time_midpoint <- function(time_str) {
   if (is.na(time_str) || time_str == "" || time_str == "N/A") return(hms(NA))
   
@@ -155,45 +154,124 @@ parse_pums_time_midpoint <- function(time_str) {
   return(seconds_to_period(midpoint_seconds %% 86400))
 }
 
+# Helper 3: Converts raw httr GET response into a clean, basic tibble
+response_to_tibble <- function(response) {
+  # Stop if the HTTP request failed
+  stop_for_status(response)
+  
+  # Parse JSON content into a character matrix
+  raw_content <- content(response, as = "text", encoding = "UTF-8")
+  matrix_data <- fromJSON(raw_content)
+  
+  # Convert to tibble using the first row as column names
+  col_names <- matrix_data[1, ]
+  body_data <- matrix_data[-1, , drop = FALSE]
+  
+  data_tibble <- as_tibble(body_data, .name_repair = "minimal")
+  colnames(data_tibble) <- col_names
+  
+  return(data_tibble)
+}
+
+
+
 
 # Create Function to take year and key to parse data, convert to tibble, 
 # and handle the various options requested in the project outline
 parse_pums <- function(YEAR = 2024,
+                       KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
                        NUM_VARS = c("AGEP", "PWGTP"),
                        CAT_VARS = c("SEX"),
-                       GEO_LEVELS = "State",
-                       GEO_SUBSET = NULL,){
-  
-parsed_data <- parse_data(YEAR, KEY) 
+                       GEO_LEVEL = "State",
+                       GEO_SUBSET = NULL){
 
-for (var in numeric_vars) {
-    if (var %in% c("JWAP", "JWDP")) {
-    # Apply Midpoint Time Helper
-      df[[var]] <- map(df[[var]], parse_pums_time_midpoint) 
-    } else {
-      df[[var]] <- as.numeric(df[[var]])
-    }
+# Verify Parameters are valid
+# Numeric Variables
+allowed_numeric <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
+if (!all(NUM_VARS %in% allowed_numeric)) {
+  stop("Error: Invalid numeric variable(s) specified.")
+}
+if (!"PWGTP" %in% NUM_VARS) {
+  stop("Error: 'PWGTP' must always be included in NUM_VARS.")
+}
+if (length(setdiff(NUM_VARS, "PWGTP")) < 1) {
+  stop("Error: You must specify at least one numeric variable other than 'PWGTP'.")
 }
 
+# Categorical Variables
+allowed_categorical <- c("FER", "HHL", "SCH", "SCHL", "SEX")
+if (!all(CAT_VARS %in% allowed_categorical)) {
+  stop("Error: Invalid categorical variable(s) specified.")
+}
+if (length(CAT_VARS) < 1) {
+  stop("Error: You must specify at least one categorical variable.")
+}
+
+# Validate Geography Level
+if (length(GEO_LEVEL) != 1 || GEO_LEVEL == "All" || !GEO_LEVEL %in% c("Region", "Division", "State")) {
+  stop("Error: 'GEO_LEVEL' must be a single value of either 'Region', 'Division', or 'State'.")
+}
+
+# ---- 2. HANDLE GEOGRAPHY SUBSETS & DEFAULTS ----
+# Setup defaults if GEO_SUBSET is NULL
+if (is.null(GEO_SUBSET)) {
+  GEO_SUBSET <- switch(GEO_LEVEL,
+                       "State" = "42",      # Default to Pennsylvania (42)
+                       "Division" = "2",   # Default Middle Atlantic Division
+                       "Region" = "1")     # Default Northeast Region
+}
+
+# Map user choice to the Census URL parameters
+# (Note: In actual application, validate GEO_SUBSET against your .rds file lists here)
+geo_param <- switch(GEO_LEVEL,
+                    "State" = paste0("state:", if(tolower(GEO_SUBSET) == "all") "*" else GEO_SUBSET),
+                    "Division" = paste0("division:", if(tolower(GEO_SUBSET) == "all") "*" else GEO_SUBSET),
+                    "Region" = paste0("region:", if(tolower(GEO_SUBSET) == "all") "*" else GEO_SUBSET))
+
+# ---- 3. CONSTRUCT URL & GET DATA ----
+base_url <- sprintf("https://census.gov", year)
+get_vars <- paste(unique(c(NUM_VARS, CAT_VARS)), collapse = ",")
+
+res <- GET(base_url, query = list(get = get_vars, `for` = geo_param, key = KEY))
+
+# Use Helper 2 to create raw tibble
+df <- response_to_tibble(res)
+
+# ---- 4. DATA PARSING & TYPE CONVERSIONS ----
+# Parse Numeric and Time variables
+for (var in NUM_VARS) {
+  if (var %in% c("JWAP", "JWDP")) {
+    # Apply Midpoint Time Helper (Helper 1)
+    df[[var]] <- map(df[[var]], parse_pums_time_midpoint) 
+  } else {
+    df[[var]] <- as.numeric(df[[var]])
+  }
+}
+
+# Parse Categorical variables into factors
+# NOTE: Replace these mock lists with your readRDS("your_file.rds") level lookups!
 sex_levels <- c("1" = "Male", "2" = "Female")
 schl_levels <- c("24" = "Doctorate degree", "23" = "Professional degree", "22" = "Master's degree") 
 
-for (var in categorical_vars) {
+for (var in CAT_VARS) {
   if (var == "SEX") {
     df[[var]] <- factor(df[[var]], levels = names(sex_levels), labels = sex_levels)
   } else if (var == "SCHL") {
     df[[var]] <- factor(df[[var]], levels = names(schl_levels), labels = schl_levels)
   } else {
-    df[[var]] <- as.factor(df[[var]])
+    df[[var]] <- as.factor(df[[var]]) # Fallback if specific labels aren't defined
   }
 }
 
+# ---- 5. ASSIGN CLASS SUBCLASS & RETURN ----
 class(df) <- c("census", class(df))
 return(df)
+
+
 }
 
 #Test the function
-parse_pums("2023", "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca")
+data2023 <- parse_pums(2023)
 
 
 
@@ -206,16 +284,6 @@ parse_pums("2023", "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca")
 
 
 
-
-
-
-            mutate(
-                  # Convert weights and codes to numeric/integer types
-                  PWGTP = as.numeric(PWGTP),
-                  SEX = as.integer(SEX),
-                  MAR = as.integer(MAR),
-                  SCHL = as.integer(SCHL)
-                )
 
 
 
