@@ -104,14 +104,7 @@ unparsed_data2024 <- httr::GET(URL2024)
 str(unparsed_data2024, max.level = 1)
 
 #HELPER FUNCTION 1: to parse and convert to tibble
-parse_data <- function(YEAR, KEY){
-#create URL
-  URL <- str_c("https://api.census.gov/data/", 
-             YEAR, "/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=", KEY)
-
-# Get and string data 
-unparsed_data <- httr::GET(URL)
-str(unparsed_data, max.level = 1)  
+parse_data <- function(unparsed_data){
    
 #Content and prase the data
 raw_json <- content(unparsed_data, as = "text")
@@ -154,31 +147,12 @@ parse_pums_time_midpoint <- function(time_str) {
   return(seconds_to_period(midpoint_seconds %% 86400))
 }
 
-# Helper 3: Converts raw httr GET response into a clean, basic tibble
-response_to_tibble <- function(response) {
-  # Stop if the HTTP request failed
-  stop_for_status(response)
-  
-  # Parse JSON content into a character matrix
-  raw_content <- content(response, as = "text", encoding = "UTF-8")
-  matrix_data <- fromJSON(raw_content)
-  
-  # Convert to tibble using the first row as column names
-  col_names <- matrix_data[1, ]
-  body_data <- matrix_data[-1, , drop = FALSE]
-  
-  data_tibble <- as_tibble(body_data, .name_repair = "minimal")
-  colnames(data_tibble) <- col_names
-  
-  return(data_tibble)
-}
-
 
 
 
 # Create Function to take year and key to parse data, convert to tibble, 
 # and handle the various options requested in the project outline
-parse_pums <- function(YEAR = 2024,
+parse_pums <- function(YEAR = "2024",
                        KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
                        NUM_VARS = c("AGEP", "PWGTP"),
                        CAT_VARS = c("SEX"),
@@ -229,13 +203,13 @@ geo_param <- switch(GEO_LEVEL,
                     "Region" = paste0("region:", if(tolower(GEO_SUBSET) == "all") "*" else GEO_SUBSET))
 
 # ---- 3. CONSTRUCT URL & GET DATA ----
-base_url <- sprintf("https://census.gov", year)
+base_url <- str_c("https://api.census.gov/data/", YEAR, "/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=")
 get_vars <- paste(unique(c(NUM_VARS, CAT_VARS)), collapse = ",")
 
 res <- GET(base_url, query = list(get = get_vars, `for` = geo_param, key = KEY))
 
 # Use Helper 2 to create raw tibble
-df <- response_to_tibble(res)
+df <- parse_data(res)
 
 # ---- 4. DATA PARSING & TYPE CONVERSIONS ----
 # Parse Numeric and Time variables
