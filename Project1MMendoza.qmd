@@ -19,6 +19,7 @@ library(tidycensus)
 library(jsonlite)
 library(httr)
 library(lubridate)
+library(ggplot2)
 
 
 # Set seed for random data creation for replication
@@ -485,7 +486,12 @@ plot.census <- function(data,
   
   plot_output <- ggplot(data, aes(x = get(cat_vars), y = get(num_vars), 
                                   weight = get(weight))) +
-                    geom_boxplot()
+                    geom_boxplot() + 
+                    labs(
+                      x = cat_var,
+                      y = num_var,
+                      title = paste("Weighted Boxplot of", num_var, "by", cat_var)
+                    )
   
   #return plot object for output
   return(plot_output)
