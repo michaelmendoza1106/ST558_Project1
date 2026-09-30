@@ -1,11 +1,21 @@
 ---
 title: "Project  1"
 author: "MMendoza"
-format: 5
+format: html
 editor: visual
 ---
 
+# Project 1
+
+## Introduction
+
+The following document is a program designed to call upon the census data available from "[api.census.gov](https://api.census.gov)". It will then create a function that can be used to pull in various types of variables from the API dataset. It will then handle factorize categorical variables, as well as create numeric time values of the mid point for specified time variables. It also creates a function that will combine a series of years if specified, and combine the data set into a single data table, adding the data source year as an additional column. Then a summary function is created that can be used to conduct the analysis at the end of the program. A generic plot function was also created to analyze whatever data set from the previous function we wanted to create.
+
+The analysis that was conducted at the end of the this document, was an investigative analysis into the census data of
+
 ## Setup/Misc.
+
+the following are the libraries that are or may be used in the program. as well as setting a randomization seed as part of good programming practices.
 
 ```{r}
 
@@ -87,7 +97,7 @@ variable_get <- function( YEAR) {
 }
 ```
 
-The following code executes the "variable_get" function on the 4 requested years ("2021", "2022", "2023", "2024")
+The following code executes the "variable_get" function on the 4 requested years ("2021", "2022", "2023", "2024") and saves the result to the Data subfolder.
 
 ```{r}
 #Call 2021 Data
@@ -117,7 +127,7 @@ unparsed_data2024 <- httr::GET(URL2024)
 str(unparsed_data2024, max.level = 1)
 ```
 
-The following is a helper function to parse the unparsed results from a GET() function. it uses the first row of the dataset to assign colnames, and all the rows after become the rows for the outputted tibble dataset.
+The following is a helper function to parse the unparsed results from a GET() function. it uses the first row of the data set to assign column names, and all the rows after become the rows for the outputted tibble data set. it also outputs the column names in all caps for formatting consistency among variables.
 
 ```{r}
 #HELPER FUNCTION 1: to parse and convert to tibble
@@ -136,14 +146,14 @@ return(output)
 }
 ```
 
-The following tests the helper function against the unparsed data from the first part of section "Parsing API Data". It stores the results as object "parsed_data_test" and prints the results
+The following tests the helper function against the unparsed data from the first part of section "Parsing API Data". It stores the results as object "parsed_data_test" and prints the results. As we can see, we get a tibble consisting of 47,476 rows and 5 variables included in the URL ("SEX", "PWGTP", "MAR", "STATE", and "SCHL"). All values are returned as characters.
 
 ```{r}
 parsed_data_test <- parse_data(unparsed_data2024)
 print(parsed_data_test)
 ```
 
-The following is a helper function. helped heavily by LLM to create, it takes a variable designated as "Time" variable and convert to a numeric datetime variable, adjusting for AM/PM as well as midnight transition. it then calculates the midpoint and returns the HMS time object. due to this being created mostly by a LLM, the testing will be done in the next function when it is used.
+The following is a helper function. helped heavily by LLM to create, it takes a variable designated as "Time" variable and convert to a numeric datetime variable, adjusting for AM/PM as well as midnight transition. it then calculates the midpoint and returns the HMS time object. due to this being created mostly by a LLM, the testing will be done in the next function when it is used. This helper function seems to have some difficulties with the data and only returns some times. not sure exactly why and I ran out of time trying to figure it out. but it does work sometimes :(.
 
 ```{r}
 #HELPER FUNCTION 2: DATE TIME (Helped from LLMs as per guidelines) time interval #strings and returns the midpoint time
@@ -180,7 +190,7 @@ parse_pums_time_midpoint <- function(time_code, var_name, all_levels) {
 
 ```
 
-The following code creates a helper function that pulls the year .rds files to get the levels needed for specified categorical variables.
+The following code creates a helper function that pulls the year .rds files to get the levels needed for specified categorical variables. it calls upon the .rds list we made earlier, and returns a list of the levels needed for formatting categorical columns
 
 ```{r}
 getLevels <- function(YEAR){
@@ -192,7 +202,7 @@ getLevels <- function(YEAR){
 }
 ```
 
-This code test the helper function and verifies that the correct list can be pulled for a specified variable ("SEX").
+This code test the helper function and verifies that the correct list can be pulled for a specified variable ("ST" for example). returned is a list of all the variable values associated with the numeric code from the database.
 
 ```{r}
 test <- getLevels(2021)
@@ -202,7 +212,18 @@ current_levels
 
 ```
 
-The following code creates the function "parse_pums". this function takes as input the specified year (2024 as default) in character format, the API key as a character, a vector of characters for the numeric variables ("AGEP", "PWGTP" are default), a vector of categorical variables ("SEX" as default), the geolevel required ("STATE" as default), and the specified geography subset specified (NULL by default to return the STATE info as needed).
+The following code creates the function "parse_pums". this function takes as input the specified year (2024 as default) in character format, the API key as a character, a vector of characters for the numeric variables ("AGEP", "PWGTP" are default), a vector of categorical variables ("SEX" as default), the geolevel required ("STATE" as default), and the specified geography subset specified (NULL by default to return the STATE info as needed). it includes various validation checks such as the following:
+
+1.  Only permits the years for 2021, 2022, 2023, and 2024.
+2.  Only allowing specified numeric variables.
+3.  Allowed categorical variables.
+4.  Verifies that required numeric variable "PWGTP" is included.
+5.  Verifies at least "PWGTP" and 1 other numeric variable has been included.
+6.  At least 1 categorical variable has been included.
+7.  Verifies GEO_LEVEL is only 1 value of either REGION, DIVISION, and STATE
+8.  Permits the use of GEO_SUBSET to include "ALL" so that all values of a GEO_LEVEL are included
+
+The function also calls upon helper function 1 "parse_data" to parse the raw input data from the specified year of data. It calls upon helper function 2 "" to format "JWAP" and "JWDP" into numeric mid point values. it will finally assign factor levels to categorical variables and assign the class of census to the data frame.
 
 ```{r}
 # Create Function to take year and key to parse data, convert to tibble, 
@@ -215,6 +236,12 @@ parse_pums <- function(YEAR = "2024",
                        GEO_SUBSET = NULL){
 
 # Verify Parameters are valid
+# valid year
+allowed_year <- c("2021", "2022", "2023", "2024")
+if (!(YEAR %in% allowed_year)) {
+  stop("Error: Invalid numeric year.")
+}
+  
 # Numeric Variables
 allowed_numeric <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
 if (!all(NUM_VARS %in% allowed_numeric)) {
@@ -319,31 +346,81 @@ return(df)
 }
 ```
 
-Test the function for various years and conditions
+the following test the function for various years and conditions that SHOULD work. The final line of code has been commented out due to long processing times or possible error causing an infinite feed back loop.
 
 ```{r}
 #Test the function w/ Defaults only
 data2024 <- parse_pums()
-
-#Test the function w/ different YEAR
-data2022 <- parse_pums(YEAR = "2022")
+# output looks good! we end up with a dataset of 4 variables, AGEP as a numeric 
+# variabled, PWGTP as a numeric variable, SEX as a factor variable with 2 levels 
+# of "Male" and "Female", and STATE as a factor variable with 52 levels.
 
 # Test the function for some everything changed (except APIKEY)
-# This did work once but takes forever to run. so idk if it still does
-# after some minor changes.
-# data2022_sub <- parse_pums(YEAR = "2022",
-#                        KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
-#                        NUM_VARS = c("AGEP", "PWGTP", "JWAP"),
-#                        CAT_VARS = c("SEX", "FER"),
-#                        GEO_LEVEL = "DIVISION",
-#                        GEO_SUBSET = "ALL")
+ data2022_sub <- parse_pums(YEAR = "2022",
+                        KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
+                        NUM_VARS = c("AGEP", "PWGTP", "JWAP"),
+                        CAT_VARS = c("SEX", "FER"),
+                        GEO_LEVEL = "DIVISION",
+                        GEO_SUBSET = "1")
+ # output mostly looks good, the added variables of JWAP and FER are included in
+ # addion to the other variables we specified (same as the defaults). One
+ # issue we can immidately notice is that PWGTP is sometimes null. I'm not exactly
+ # sure why this is, other than one of the conditions in the helper function
+ # doesn't account for some situation in the source data. This is definitely 
+ # fixable but I'd need more time to change the function so I can see the raw 
+ # output from the dataset, as well as updating the helper function to output
+ # all objects to R so I can review what part of the code is malfunctioning.or
+ # maybe there's just that many NAs. It just seems odd.
+
+ # Test the function for GEO_SUBSET = "ALL"
+ # I've excluded this code because I don't fully know if it works or not. 
+ # the dataset seems to be so larged it bricks my computer (which is rather
+ # concerning because my PC build has a 48 GB of ram and a 12th gen 12 core CPU.)
+ # I've included the code as it should be tested, however I do not think my PC 
+ # is able to handle this.
+ # data2022_sub <- parse_pums(GEO_SUBSET = "ALL")
+```
+
+The following code intentionally tries to fail the code to verify the validation checks are functioning.
+
+```{r}
+# year check failure
+failed1 <- parse_pums(YEAR = "2000")
+# validation success!
+```
+
+```{r}
+# Numeric check failures
+failed2 <- parse_pums(NUM_VARS = c("PWGTP", "FAKE"))
+# Validition success!
+```
+
+```{r}
+# Categorical check failures
+failed2 <- parse_pums(CAT_VARS = c("FAKE"))
+# Validition success!
+```
+
+```{r}
+# PWGTP not included check failures
+failed2 <- parse_pums(NUM_VARS = c("AGEP"))
+# Validition success!
+```
+
+```{r}
+# PWGTP and 1 other Numeric variable check failures
+failed2 <- parse_pums(NUM_VARS = c("PWGTP"))
+# Validition sucess!
+```
+
+```{r}
 
 ```
 
 The following code creates a helper function to combine datasets and assigning the column of "YEAR" to the tibble.
 
 ```{r}
-#Helper function to combine combine a list of single-year dataset
+# Helper function to combine combine a list of single-year dataset
 combine_pums_years <- function(data_list) {
   # Extract year tracking strings from the list names
   years <- names(data_list)
@@ -398,7 +475,8 @@ parse_pums_multi <- function(YEARS = c("2023", "2024"),
 }
 
 # test function
-combined_data <- parse_pums_multi(CAT_VARS = c("SEX", "FER", "HHL"), NUM_VARS = c("AGEP", "PWGTP", "GASP"))
+combined_data <- parse_pums_multi(CAT_VARS = c("SEX", "FER", "HHL"), 
+                                  NUM_VARS = c("AGEP", "PWGTP", "GASP"))
 ```
 
 ## Part 2: Function Writing
@@ -406,7 +484,7 @@ combined_data <- parse_pums_multi(CAT_VARS = c("SEX", "FER", "HHL"), NUM_VARS = 
 The following function creates a function to calculate Numeric Summaries for the census Summary method.
 
 ```{r}
-#Summarize
+# Summarize Function
 summarize.census <- function(data, 
                              num_vars = NULL, 
                              cat_vars = NULL,
@@ -445,7 +523,7 @@ summarize.census <- function(data,
     }
   }
   
-  # Compute counts for categorical variables (unweighted or weighted depending on standard count, using n() or sum(PWGTP))
+  # Compute counts for categorical variables
   if (length(cat_vars) > 0) {
     for (var in cat_vars) {
       cat_counts <- data %>%
