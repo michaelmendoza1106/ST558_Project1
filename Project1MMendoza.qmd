@@ -482,5 +482,12 @@ plot.census <- function(data,
   if (!(length(cat_vars) = 1)) {
     stop("ERROR: weight must be a length of 1")
   }
+  
+  plot_output <- ggplot(data, aes(x = get(cat_var), y = get(num_var), weight = get(weight)))
+  
+  #return plot object for output
+  return(plot_output)
 }
+
+plot <- plot()
 ```
