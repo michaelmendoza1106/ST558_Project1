@@ -363,7 +363,7 @@ combine_pums_years <- function(data_list) {
 
 ```
 
-The following code wraps the list of variables and injects them into
+The following code wraps the list of variables and injects them into.
 
 ```{r}
 #Function to excute all YEARS entered with specified values.
@@ -395,8 +395,74 @@ parse_pums_multi <- function(YEARS = c("2023", "2024"),
   return(final_df)
 }
 
-#test function
-combined_data <- parse_pums_multi()
+# test function
+combined_data <- parse_pums_multi(CAT_VARS = c("SEX", "FER", "HHL"), NUM_VARS = c("AGEP", "PWGTP", "GASP"))
 ```
 
 ## Part 2: Function Writing
+
+The following function creates a function to calculate Numeric Summaries for the census Summary method.
+
+```{r}
+#Summarize
+summarize.census <- function(data, 
+                             num_vars = NULL, 
+                             cat_vars = NULL) {
+  
+  # Determine weight vector name (PWGTP)
+  weight_col <- "PWGTP"
+  
+  # Default numeric variables: all numeric except PWGTP and time variables (if any)
+  if (is.null(num_vars)) {
+    num_vars <- data %>% 
+      select(where(is.numeric)) %>% 
+      select(-any_of(weight_col)) %>% 
+      names()
+  }
+  
+  # Default categorical variables: all non-numeric (or year treated as categorical)
+  if (is.null(cat_vars)) {
+    cat_vars <- data %>% 
+      select(-any_of(c(num_vars, weight_col))) %>% 
+      names()
+  }
+  
+  results <- list()
+  
+  # Compute weighted means and standard deviations for numeric variables
+  if (length(num_vars) > 0) {
+    for (v in num_vars) {
+      num_vec <- data[[v]]
+      wt_vec  <- data[[weight_col]]
+      
+      # Sample mean formula provided
+      s_mean <- sum(num_vec * wt_vec) / sum(wt_vec)
+      # Sample standard deviation formula provided
+      s_sd   <- sqrt(sum((num_vec^2) * wt_vec) / sum(wt_vec) - s_mean^2)
+      
+      results[[paste0(v, "_mean")]] <- s_mean
+      results[[paste0(v, "_sd")]]   <- s_sd
+    }
+  }
+  
+  # Compute counts for categorical variables (unweighted or weighted depending on standard count, using n() or sum(PWGTP))
+  if (length(cat_vars) > 0) {
+    for (c_var in cat_vars) {
+      cat_counts <- data %>%
+        group_by(.data[[c_var]]) %>%
+        summarize(count = n(), .groups = "drop")
+      
+      results[[paste0(c_var, "_counts")]] <- deframe(cat_counts)
+    }
+  }
+  
+  return(results)
+}
+```
+
+The code below tests the function
+
+```{r}
+summary <- summary(combined_data)
+print(summary)
+```
