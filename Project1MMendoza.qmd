@@ -145,31 +145,34 @@ The following is a helper function. helped heavily by LLM to create, it takes a 
 
 ```{r}
 #HELPER FUNCTION 2: DATE TIME (Helped from LLMs as per guidelines) time interval #strings and returns the midpoint time
-parse_pums_time_midpoint <- function(time_str) {
-  if (is.na(time_str) || time_str == "" || time_str == "N/A") return(hms(NA))
+parse_pums_time_midpoint <- function(time_code, var_name, all_levels) {
+  # 1. Handle missing/invalid data inputs safely
+  if (is.na(time_code) || time_code == "" || time_code == "N/A") return(hms(NA))
   
-  # Example pattern: "08:00 a.m. to 08:04 a.m."
-  # Extract all HH:MM matches and AM/PM indicators
+  # 2. Grab the actual descriptive string label mapped to the numeric code
+  # Example: Code "020" maps to "06:00 a.m. to 06:29 a.m."
+  time_str <- all_levels[[var_name]]$values$item[[as.character(time_code)]]
+  
+  if (is.null(time_str) || is.na(time_str)) return(hms(NA))
+  
+  # 3. Extract the two HH:MM timestamps with their AM/PM flags
   times <- str_extract_all(time_str, "\\d{2}:\\d{2}\\s*(a\\.m\\.|p\\.m\\.|am|pm)")[[1]]
+  if (length(times) < 2) return(hms(NA)) 
   
-  if (length(times) < 2) return(hms(NA)) # Return NA if it doesn't match an interval
-  
-  # Convert extracted strings to full datetime objects to calculate midpoint cleanly
+  # 4. Extract hour/minute parts using standard lubridate structures
   t1 <- hm(str_extract(times[1], "\\d{2}:\\d{2}"))
   t2 <- hm(str_extract(times[2], "\\d{2}:\\d{2}"))
   
-  # Adjust for PM
+  # 5. Apply standardized 24-hour PM adjustments
   if (str_detect(tolower(times[1]), "p\\.m\\.|pm") && hour(t1) < 12) t1 <- t1 + hours(12)
   if (str_detect(tolower(times[2]), "p\\.m\\.|pm") && hour(t2) < 12) t2 <- t2 + hours(12)
-  # Handle midnight transitions if necessary (e.g., 11:50 pm to 12:05 am)
   if (t2 < t1) t2 <- t2 + hours(24)
   
-  # Calculate midpoint seconds from midnight
+  # 6. Compute exact midpoint duration scale
   s1 <- as.numeric(t1)
   s2 <- as.numeric(t2)
   midpoint_seconds <- (s1 + s2) / 2
   
-  # Wrap back into an hms time object (modulus handles rolling over 24 hours)
   return(seconds_to_period(midpoint_seconds %% 86400))
 }
 
@@ -191,7 +194,7 @@ This code test the helper function and verifies that the correct list can be pul
 
 ```{r}
 test <- getLevels(2021)
-current_levels <- test[["SEX"]]$values$item
+current_levels <- test[["ST"]]$values$item
 
 current_levels
 
@@ -236,50 +239,57 @@ if (length(GEO_LEVEL) != 1 || GEO_LEVEL == "ALL" || !GEO_LEVEL %in% c("REGION", 
   stop("Error: 'GEO_LEVEL' must be a single value of either 'REGION', 'DIVISION', or 'STATE'.")
 }
 
+# Save GEO_LEVEL before updating for default assignment
+geo_trace <- GEO_LEVEL
+
 # update GEO_LEVEL from STATE to ST based on year.
 if (GEO_LEVEL == "STATE" && YEAR %in% c("2021", "2022")) {
   GEO_LEVEL <- "ST"
 }
 
 # Setup defaults if GEO_SUBSET is NULL
-if (is.null(GEO_SUBSET)) {
-  GEO_SUBSET <- switch(GEO_LEVEL,
-                       "STATE" = "42",    # Default to Pennsylvania (42)
-                       "DIVISION" = "2",  # Default Middle Atlantic Division
-                       "REGION" = "1")    # Default Northeast Region
+if (is.null(GEO_SUBSET) || !identical(GEO_SUBSET, "ALL")) {
+  if (geo_trace == "STATE") {
+    GEO_SUBSET <- "37" # Default to NC
+  } else if (geo_trace == "DIVISION") {
+    GEO_SUBSET <- "5"  # Default South Atlantic (South region)
+  } else if (geo_trace == "REGION") {
+    GEO_SUBSET <- "3"  # Default South Region
+  }
 }
 
-# Map user choice to the Census URL parameters
-geo_param <- switch(GEO_LEVEL,
-                    "STATE" = paste0("state:", 
-                                     if (tolower(GEO_SUBSET) == "ALL") "*"
-                                     else GEO_SUBSET),
-                    "DIVISION" = paste0("division:", 
-                                        if (tolower(GEO_SUBSET) == "ALL") "*" 
-                                        else GEO_SUBSET),
-                    "REGION" = paste0("region:", 
-                                      if (tolower(GEO_SUBSET) == "ALL") "*" 
-                                      else GEO_SUBSET)
-                    )
 
 # builds URL to connect to API and get unparsed data for specified Numeric
 # and categorical variables.
-base_url <- str_c("https://api.census.gov/data/", YEAR, "/acs/acs1/pums?get=SEX,PWGTP,MAR&for=state:*&SCHL=24&key=")
+base_url <- str_c("https://api.census.gov/data/", YEAR, "/acs/acs1/pums")
 get_vars <- paste(unique(c(NUM_VARS, CAT_VARS)), collapse = ",")
 
-# connects and pulls unparsed data.
-res <- GET(base_url, query = list(get = get_vars, `for` = geo_param, key = KEY))
+# API Query to deal with ST/STATE discrepency
+api_query <- if (geo_trace == "STATE") "state" 
+             else tolower(GEO_LEVEL)
+
+# Connect and pull data using a dynamic wildcard region request
+res <- GET(base_url, query = list(
+  get = get_vars, 
+  `for` = str_c(api_query, ":*"), 
+  key = KEY
+))
 
 # Use Helper 1 to parse data and create raw tibble
 df <- parse_data(res)
+
+# Subset tibble for Geographic parameters.
+if (!identical(GEO_SUBSET, "ALL")) {
+  df <- filter(df, .data[[geo_trace]] == GEO_SUBSET)
+}
 
 # ---- 4. DATA PARSING & TYPE CONVERSIONS ----
 # Implementation taken from LLM with minor adjustments.
 # Parse Numeric and Time variables
 for (var in NUM_VARS) {
   if (var %in% c("JWAP", "JWDP")) {
-    # Apply Midpoint Time Helper (Helper 2)
-    df[[var]] <- map(df[[var]], parse_pums_time_midpoint) 
+    # Dynamically map values by supplying the column code, column name, and levels      # metadata map
+    df[[var]] <- map(df[[var]], ~parse_pums_time_midpoint(.x, var_name = var, all_levels = all_levels)) 
   } else {
     df[[var]] <- as.numeric(df[[var]])
   }
@@ -296,6 +306,11 @@ for (var in CAT_VARS) {
                         labels = current_levels)
 }
 
+# parse GEO_LEVEL into factor variable
+current_levels <- all_levels[[GEO_LEVEL]]$values$item
+df[[geo_trace]] <- factor(df[[geo_trace]], levels = names(current_levels), 
+                    labels = current_levels)
+
 # do the last step to assign class to tibble. 
 class(df) <- c("census", class(df))
 return(df)
@@ -308,6 +323,8 @@ Test the function for various years and conditions
 #Test the function w/ Defaults only
 data2024 <- parse_pums()
 
+#Test the function w/ different YEAR
+data2022 <- parse_pums(YEAR = "2022")
 
 #Test the function for some everything changed (except APIKEY)
 data2022_sub <- parse_pums(YEAR = "2022",
@@ -315,7 +332,7 @@ data2022_sub <- parse_pums(YEAR = "2022",
                        NUM_VARS = c("AGEP", "PWGTP", "JWAP"),
                        CAT_VARS = c("SEX", "FER"),
                        GEO_LEVEL = "DIVISION",
-                       GEO_SUBSET = NULL)
+                       GEO_SUBSET = "ALL")
 
 ```
 
