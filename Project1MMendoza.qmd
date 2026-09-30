@@ -569,9 +569,10 @@ summary <- summary(combined_data)
 summary
 ```
 
-The following function creates a function that creates a generic plot function for a census class table.
+The following function creates a function that creates a generic plot function for a census class table. It first includes 3 checks to verify that cat_vars, num_vars, and weight are all exactly 1 variable. then, it uses ggplot2 and optional ggplot2 package "quantreg" to create a box plot of the weighted numeric variable by the categorical variable. it then returns the plot for it to be called as needed. colors are assigned by the category variable, weighted by specified weighted variable (PWGTP by default).
 
 ```{r}
+# Create the plot.census function
 plot.census <- function(data,
                         cat_vars,
                         num_vars,
@@ -588,20 +589,54 @@ plot.census <- function(data,
   }
   
   plot_output <- ggplot(data, aes(x = get(cat_vars), y = get(num_vars), 
-                                  weight = get(weight))) +
+                                  weight = get(weight), fill = get(cat_vars))) +
                     geom_boxplot() + 
                     labs(
                       x = cat_vars,
                       y = num_vars,
-                      title = paste("Weighted Boxplot of", num_vars, "by", cat_vars)
+                      title = paste("Weighted Boxplot of", num_vars, 
+                                    "by", cat_vars),
+                      fill = cat_vars
                     )
   
   #return plot object for output
   return(plot_output)
 }
+```
 
+The following code is an example use of the plot function, using the earlier combined data set made from the parse_pums_multi example test. The example shows the boxplot of the monthly gas cost compared relative to the groups of people who have had a child with the past 12 Months of the census ("N/A", "No", "Yes"). we can see the plot works, though this isn't very interesting as there's not much logic to how having a child and the cost of gas relate to one another.
 
-
+```{r}
+# test the plot.census function
 plot <- plot(data = combined_data, cat_vars = "FER", num_vars = "GASP") 
 plot
 ```
+
+## Investigation
+
+In order to demonstrate using these functions to investigate the database, a comparison of the different age among the different sexes within a the North Carolina state during the 2024. to do this, we first must use the parse_pums function. Thankfully, we can use the default settings for most of the function, but we will need to adjust the year to 2023.
+
+```{r}
+# call 2023 data for NC state as a tibble including only default variables
+data2023 <- parse_pums(YEAR = "2023")
+```
+
+with our dataset now created, we can use summarize.census general function in order to get a brief overview of the dataset. This we can review and see if there are any abnormalities that indicate something wrong with out dataset.
+
+```{r}
+# execute summary function and display results
+summary <- summary(data2023)
+summary
+```
+
+With our summary results, we see that there are there are 54412 Males and 57508 Females. Among both of these sexes, we see that the oldest a person recorded is 93, and the youngest is 0, with 25% of all people being below the age of 22, 50% below the age of 44, 75% below the age of 63, and the average age being 43.43 years old.
+
+Now use the plot.census function to see the boxplot for males and female ages, and see if we notice anything of note.
+
+```{r}
+# create boxplot of age vs sex using plot.census function
+plot <- plot(data = data2023, cat_vars = "SEX", num_vars = "AGEP") 
+plot
+```
+
+from this, we can see the medians, IQR, and Minimum/Maximum for both Male and Female. we can noticed that the IQR for females, seems to be slightly higher than that for Males, as well as the median also being slightly higher. that said, it seems that men and women live to be roughly the same age based on the visual of the graph.
