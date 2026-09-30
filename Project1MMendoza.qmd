@@ -483,12 +483,14 @@ plot.census <- function(data,
     stop("ERROR: weight must be a length of 1")
   }
   
-  plot_output <- ggplot(data, aes(x = get(cat_var), y = get(num_var), weight = get(weight)))
+  plot_output <- ggplot(data, aes(x = get(cat_vars), y = get(num_vars), 
+                                  weight = get(weight))) +
+                    geom_boxplot()
   
   #return plot object for output
   return(plot_output)
 }
 
-plot <- plot(data = combined_data, cat_vars = "FER", num_vars = "GASP")
+plot <- plot(data = combined_data, cat_vars = "FER", num_vars = "GASP") 
 plot
 ```
