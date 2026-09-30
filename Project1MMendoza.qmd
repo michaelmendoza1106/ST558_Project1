@@ -488,9 +488,9 @@ plot.census <- function(data,
                                   weight = get(weight))) +
                     geom_boxplot() + 
                     labs(
-                      x = cat_var,
-                      y = num_var,
-                      title = paste("Weighted Boxplot of", num_var, "by", cat_var)
+                      x = cat_vars,
+                      y = num_vars,
+                      title = paste("Weighted Boxplot of", num_vars, "by", cat_vars)
                     )
   
   #return plot object for output
