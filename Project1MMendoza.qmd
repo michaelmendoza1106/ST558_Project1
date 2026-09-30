@@ -20,6 +20,7 @@ library(jsonlite)
 library(httr)
 library(lubridate)
 library(ggplot2)
+library(quantreg) #needed for ggplot2 to do weighted graphs
 
 
 # Set seed for random data creation for replication
@@ -496,6 +497,8 @@ plot.census <- function(data,
   #return plot object for output
   return(plot_output)
 }
+
+
 
 plot <- plot(data = combined_data, cat_vars = "FER", num_vars = "GASP") 
 plot
