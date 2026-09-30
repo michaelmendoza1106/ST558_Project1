@@ -326,13 +326,15 @@ data2024 <- parse_pums()
 #Test the function w/ different YEAR
 data2022 <- parse_pums(YEAR = "2022")
 
-#Test the function for some everything changed (except APIKEY)
-data2022_sub <- parse_pums(YEAR = "2022",
-                       KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
-                       NUM_VARS = c("AGEP", "PWGTP", "JWAP"),
-                       CAT_VARS = c("SEX", "FER"),
-                       GEO_LEVEL = "DIVISION",
-                       GEO_SUBSET = "ALL")
+# Test the function for some everything changed (except APIKEY)
+# This did work once but takes forever to run. so idk if it still does
+# after some minor changes.
+# data2022_sub <- parse_pums(YEAR = "2022",
+#                        KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
+#                        NUM_VARS = c("AGEP", "PWGTP", "JWAP"),
+#                        CAT_VARS = c("SEX", "FER"),
+#                        GEO_LEVEL = "DIVISION",
+#                        GEO_SUBSET = "ALL")
 
 ```
 
@@ -361,7 +363,10 @@ combine_pums_years <- function(data_list) {
 
 ```
 
+The following code wraps the list of variables and injects them into
+
 ```{r}
+#Function to excute all YEARS entered with specified values.
 parse_pums_multi <- function(YEARS = c("2023", "2024"),
                              KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
                              NUM_VARS = c("AGEP", "PWGTP"),
@@ -390,6 +395,8 @@ parse_pums_multi <- function(YEARS = c("2023", "2024"),
   return(final_df)
 }
 
+#test function
+combined_data <- parse_pums_multi()
 ```
 
 ## Part 2: Function Writing
