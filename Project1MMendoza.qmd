@@ -1,7 +1,7 @@
 ---
 title: "Project  1"
 author: "MMendoza"
-format: html
+format: 5
 editor: visual
 ---
 
@@ -283,6 +283,9 @@ if (!identical(GEO_SUBSET, "ALL")) {
   df <- filter(df, .data[[geo_trace]] == GEO_SUBSET)
 }
 
+# use getLevels helper function to get list of variable levels. 
+all_levels <- getLevels(YEAR)
+
 # ---- 4. DATA PARSING & TYPE CONVERSIONS ----
 # Implementation taken from LLM with minor adjustments.
 # Parse Numeric and Time variables
@@ -294,9 +297,6 @@ for (var in NUM_VARS) {
     df[[var]] <- as.numeric(df[[var]])
   }
 }
-
-# use getLevels helper function to get list of variable levels. 
-all_levels <- getLevels(YEAR)
 
 # Parse Categorical variables into factors
 for (var in CAT_VARS) {
@@ -336,15 +336,59 @@ data2022_sub <- parse_pums(YEAR = "2022",
 
 ```
 
+The following code creates a helper function to combine datasets and assigning the column of "YEAR" to the tibble.
+
 ```{r}
+#Helper function to combine combine a list of single-year dataset
+combine_pums_years <- function(data_list) {
+  # Extract year tracking strings from the list names
+  years <- names(data_list)
+  
+  # Inject the year column into each individual data frame
+  for (i in seq_along(data_list)) {
+    data_list[[i]] <- cbind(year = years[i], data_list[[i]])
+  }
+  
+  # Row-bind all datasets cleanly using base R
+  combined_df <- do.call(rbind, data_list)
+  
+  # Structure the final output as a census tibble
+  final_tibble <- as_tibble(combined_df)
+  class(final_tibble) <- c("census", class(final_tibble))
+  
+  return(final_tibble)
+}
 
+```
 
-
-
-
-
-
-
+```{r}
+parse_pums_multi <- function(YEARS = c("2023", "2024"),
+                             KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
+                             NUM_VARS = c("AGEP", "PWGTP"),
+                             CAT_VARS = c("SEX"),
+                             GEO_LEVEL = "STATE",
+                             GEO_SUBSET = NULL) {
+  
+  # Pre-allocate our storage list
+  data_list <- vector("list", length(YEARS))
+  names(data_list) <- YEARS
+  
+  # Fetch data year-by-year
+  for (i in seq_along(YEARS)) {
+    data_list[[i]] <- parse_pums(
+      YEAR = YEARS[i],
+      KEY = KEY,
+      NUM_VARS = NUM_VARS,
+      CAT_VARS = CAT_VARS,
+      GEO_LEVEL = GEO_LEVEL,
+      GEO_SUBSET = GEO_SUBSET
+    )
+  }
+  
+  # Execute our separate combining function
+  final_df <- combine_pums_years(data_list)
+  return(final_df)
+}
 
 ```
 
