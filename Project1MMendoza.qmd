@@ -374,10 +374,11 @@ data2024 <- parse_pums()
 
  # Test the function for GEO_SUBSET = "ALL"
  # I've excluded this code because I don't fully know if it works or not. 
- # the dataset seems to be so larged it bricks my computer (which is rather
- # concerning because my PC build has a 48 GB of ram and a 12th gen 12 core CPU.)
- # I've included the code as it should be tested, however I do not think my PC 
- # is able to handle this.
+ # because I could not get the all function working appriopately.
+ # my idea was that ALL would include the 3 other variables
+ # when calling the API and include them as all :* in the url. 
+ # however I could not figure out exactly how to format this without my code 
+ # breaking. there should be some way to accomplish it by this method. 
  # data2022_sub <- parse_pums(GEO_SUBSET = "ALL")
 ```
 
@@ -385,42 +386,58 @@ The following code intentionally tries to fail the code to verify the validation
 
 ```{r}
 # year check failure
-failed1 <- parse_pums(YEAR = "2000")
+failed <- parse_pums(YEAR = "2000")
 # validation success!
 ```
 
 ```{r}
 # Numeric check failures
-failed2 <- parse_pums(NUM_VARS = c("PWGTP", "FAKE"))
+failed <- parse_pums(NUM_VARS = c("PWGTP", "FAKE"))
 # Validition success!
 ```
 
 ```{r}
 # Categorical check failures
-failed2 <- parse_pums(CAT_VARS = c("FAKE"))
+failed <- parse_pums(CAT_VARS = c("FAKE"))
 # Validition success!
 ```
 
 ```{r}
 # PWGTP not included check failures
-failed2 <- parse_pums(NUM_VARS = c("AGEP"))
+failed <- parse_pums(NUM_VARS = c("AGEP"))
 # Validition success!
 ```
 
 ```{r}
 # PWGTP and 1 other Numeric variable check failures
-failed2 <- parse_pums(NUM_VARS = c("PWGTP"))
-# Validition sucess!
+failed <- parse_pums(NUM_VARS = c("PWGTP"))
+# Validition success!
 ```
 
 ```{r}
-
+# at least 1 categorical varaible check failures
+failed <- parse_pums(CAT_VARS = NULL)
+# Validition success!
 ```
 
-The following code creates a helper function to combine datasets and assigning the column of "YEAR" to the tibble.
+```{r}
+# GEO_LEVEL check failures: 1 value not in Region, State, or Division. 
+# ALso that "ALL" doesn't work is sort of implicit by the first condition of the
+# 3 permitted values. however it was included as requested.
+failed <- parse_pums(GEO_LEVEL = c("PWGTP"))
+# Validition success!
+```
 
 ```{r}
-# Helper function to combine combine a list of single-year dataset
+# GEO_LEVEL check failures: Multiple inputs
+failed <- parse_pums(GEO_LEVEL = c("STATE", "REGION"))
+# Validition success!
+```
+
+The following code creates a helper function to combine datasets and assigning the column of "YEAR" to the tibble. it accomplishes this by assigning the year to each variable year within a datalist. it then combines the datalist together to output a single table. this datalist wil be created in the next function called "parse_pums_multi".
+
+```{r}
+# Helper function to combine combine a list of single-year dataset.
 combine_pums_years <- function(data_list) {
   # Extract year tracking strings from the list names
   years <- names(data_list)
@@ -430,7 +447,7 @@ combine_pums_years <- function(data_list) {
     data_list[[i]] <- cbind(year = years[i], data_list[[i]])
   }
   
-  # Row-bind all datasets cleanly using base R
+  # Row-bind all datasets
   combined_df <- do.call(rbind, data_list)
   
   # Structure the final output as a census tibble
@@ -442,10 +459,10 @@ combine_pums_years <- function(data_list) {
 
 ```
 
-The following code wraps the list of variables and injects them into.
+The following code executes the parse_pums function for each year, where it will store each year separate inside of a data list, and then will use the "combine_pums_years" function to create and output a single tibble, with an additional column added for each year the data set originates from.
 
 ```{r}
-#Function to excute all YEARS entered with specified values.
+# Function to excute all YEARS entered with specified values.
 parse_pums_multi <- function(YEARS = c("2023", "2024"),
                              KEY = "2aa23f6929b5b51bb7e24e90cc25a4c02d9290ca",
                              NUM_VARS = c("AGEP", "PWGTP"),
@@ -473,15 +490,22 @@ parse_pums_multi <- function(YEARS = c("2023", "2024"),
   final_df <- combine_pums_years(data_list)
   return(final_df)
 }
+```
 
+The following code is an example of the parse_pums_multi function in use. for this, I simply used the default years of 2023 and 2024, with additional CAT_VARS variables that will be investigated during the next part of the project.
+
+```{r}
 # test function
-combined_data <- parse_pums_multi(CAT_VARS = c("SEX", "FER", "HHL"), 
-                                  NUM_VARS = c("AGEP", "PWGTP", "GASP"))
+combined_data <- parse_pums_multi(NUM_VARS = c("AGEP", "PWGTP", "GASP"),
+                                  CAT_VARS = c("SEX", "FER", "HHL"))
+
+
+
 ```
 
 ## Part 2: Function Writing
 
-The following function creates a function to calculate Numeric Summaries for the census Summary method.
+The following function creates a function to calculate Numeric Summaries for the census Summary method. it first auto populates all numeric and categorical variables permited into num_vars and cat_vars when either is null. then it computes the weighted means and standard deviations based on the formulas provided for all numeric variables, Lastly, it computes the counts for each categorical variables and returns the results for review.
 
 ```{r}
 # Summarize Function
@@ -490,7 +514,7 @@ summarize.census <- function(data,
                              cat_vars = NULL,
                              weight = "PWGTP") {
   
-  # Default numeric variables: all numeric except PWGTP and time variables (if any)
+  # Selects all numeric variables except specified ones if num_vars is NULL
   if (is.null(num_vars)) {
     num_vars <- data %>% 
       select(where(is.numeric)) %>% 
@@ -498,7 +522,7 @@ summarize.census <- function(data,
       names()
   }
   
-  # Default categorical variables: all non-numeric (or year treated as categorical)
+  # Selects all categorical variables except specified ones if cat_vars is NULL
   if (is.null(cat_vars)) {
     cat_vars <- data %>% 
       select(-any_of(c(num_vars, weight_col))) %>% 
@@ -509,8 +533,8 @@ summarize.census <- function(data,
   
   # Compute weighted means and standard deviations for numeric variables
   if (length(num_vars) > 0) {
-    for (v in num_vars) {
-      num_vec <- data[[v]]
+    for (var in num_vars) {
+      num_vec <- data[[var]]
       wt_vec  <- data[[weight]]
       
       # Sample mean formula provided
@@ -538,7 +562,7 @@ summarize.census <- function(data,
 }
 ```
 
-The code below tests the function and prints the summary statistics from the combined year output from previous code.
+The code below tests the function and prints the summary statistics from the combined year output from previous code. the output is a bit hard to read due to the long factor level names. otherwise results seem good.
 
 ```{r}
 summary <- summary(combined_data)
