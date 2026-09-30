@@ -385,42 +385,49 @@ data2024 <- parse_pums()
 The following code intentionally tries to fail the code to verify the validation checks are functioning.
 
 ```{r}
+#| eval: false
 # year check failure
 failed <- parse_pums(YEAR = "2000")
 # validation success!
 ```
 
 ```{r}
+#| eval: false
 # Numeric check failures
 failed <- parse_pums(NUM_VARS = c("PWGTP", "FAKE"))
 # Validition success!
 ```
 
 ```{r}
+#| eval: false
 # Categorical check failures
 failed <- parse_pums(CAT_VARS = c("FAKE"))
 # Validition success!
 ```
 
 ```{r}
+#| eval: false
 # PWGTP not included check failures
 failed <- parse_pums(NUM_VARS = c("AGEP"))
 # Validition success!
 ```
 
 ```{r}
+#| eval: false
 # PWGTP and 1 other Numeric variable check failures
 failed <- parse_pums(NUM_VARS = c("PWGTP"))
 # Validition success!
 ```
 
 ```{r}
+#| eval: false
 # at least 1 categorical varaible check failures
 failed <- parse_pums(CAT_VARS = NULL)
 # Validition success!
 ```
 
 ```{r}
+#| eval: false
 # GEO_LEVEL check failures: 1 value not in Region, State, or Division. 
 # ALso that "ALL" doesn't work is sort of implicit by the first condition of the
 # 3 permitted values. however it was included as requested.
@@ -429,6 +436,7 @@ failed <- parse_pums(GEO_LEVEL = c("PWGTP"))
 ```
 
 ```{r}
+#| eval: false
 # GEO_LEVEL check failures: Multiple inputs
 failed <- parse_pums(GEO_LEVEL = c("STATE", "REGION"))
 # Validition success!
