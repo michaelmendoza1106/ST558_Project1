@@ -12,7 +12,7 @@ editor: visual
 # Uncomment Librarys Required
 library(tidyverse)
 library(readxl)
-library(readr)
+library(readr) 
 library(DBI)
 library(RSQLite)
 library(tidycensus)
@@ -407,16 +407,14 @@ The following function creates a function to calculate Numeric Summaries for the
 #Summarize
 summarize.census <- function(data, 
                              num_vars = NULL, 
-                             cat_vars = NULL) {
-  
-  # Determine weight vector name (PWGTP)
-  weight_col <- "PWGTP"
+                             cat_vars = NULL,
+                             weight = "PWGTP") {
   
   # Default numeric variables: all numeric except PWGTP and time variables (if any)
   if (is.null(num_vars)) {
     num_vars <- data %>% 
       select(where(is.numeric)) %>% 
-      select(-any_of(weight_col)) %>% 
+      select(-any_of(weight)) %>% 
       names()
   }
   
@@ -433,7 +431,7 @@ summarize.census <- function(data,
   if (length(num_vars) > 0) {
     for (v in num_vars) {
       num_vec <- data[[v]]
-      wt_vec  <- data[[weight_col]]
+      wt_vec  <- data[[weight]]
       
       # Sample mean formula provided
       s_mean <- sum(num_vec * wt_vec) / sum(wt_vec)
@@ -447,12 +445,12 @@ summarize.census <- function(data,
   
   # Compute counts for categorical variables (unweighted or weighted depending on standard count, using n() or sum(PWGTP))
   if (length(cat_vars) > 0) {
-    for (c_var in cat_vars) {
+    for (var in cat_vars) {
       cat_counts <- data %>%
-        group_by(.data[[c_var]]) %>%
+        group_by(.data[[var]]) %>%
         summarize(count = n(), .groups = "drop")
       
-      results[[paste0(c_var, "_counts")]] <- deframe(cat_counts)
+      results[[paste0(var, "_counts")]] <- deframe(cat_counts)
     }
   }
   
@@ -460,9 +458,29 @@ summarize.census <- function(data,
 }
 ```
 
-The code below tests the function and prints the summary statistics.
+The code below tests the function and prints the summary statistics from the combined year output from previous code.
 
 ```{r}
 summary <- summary(combined_data)
-print(summary)
+summary
+```
+
+The following function creates a function that creates a generic plot function for a census class table.
+
+```{r}
+plot.census <- function(data,
+                        cat_vars,
+                        num_vars,
+                        weight = "PWGTP") {
+  # Validate Length of inputs
+  if (!(length(cat_vars) = 1)) {
+    stop("ERROR: cat_vars must be a length of 1")
+  }
+  if (!(length(cat_vars) = 1)) {
+    stop("ERROR: num_vars must be a length of 1")
+  }
+  if (!(length(cat_vars) = 1)) {
+    stop("ERROR: weight must be a length of 1")
+  }
+}
 ```
