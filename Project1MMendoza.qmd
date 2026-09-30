@@ -489,5 +489,6 @@ plot.census <- function(data,
   return(plot_output)
 }
 
-plot <- plot()
+plot <- plot(data = combined_data, cat_vars = "FER", num_vars = "GASP")
+plot
 ```
